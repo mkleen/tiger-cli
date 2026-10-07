@@ -26,6 +26,39 @@ func TestFormatSchema(t *testing.T) {
 			},
 			expected: "DATABASE: mydb (abc123)\n",
 		},
+		{
+			name: "extensions are listed under the database header",
+			schema: &DatabaseSchema{
+				ID:   "abc123",
+				Name: "mydb",
+				Extensions: []ExtensionInfo{
+					{Name: "timescaledb", Version: "2.22.0", Schema: "public"},
+					{Name: "timescaledb_toolkit", Version: "1.21.0", Schema: "public"},
+				},
+				Schemas: []NamespacedSchema{
+					{
+						Name: "public",
+						Tables: []TableSchema{
+							{
+								Name:    "metrics",
+								Columns: []TableColumnSchema{{Name: "time", Type: "timestamptz"}},
+							},
+						},
+					},
+				},
+			},
+			expected: `DATABASE: mydb (abc123)
+
+EXTENSIONS:
+  timescaledb 2.22.0 (schema: public)
+  timescaledb_toolkit 1.21.0 (schema: public)
+
+SCHEMA: public
+
+TABLE: metrics
+  time  TIMESTAMPTZ
+`,
+		},
 
 		// ==================== Table Column Type Tests ====================
 		{

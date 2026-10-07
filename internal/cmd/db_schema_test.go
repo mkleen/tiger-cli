@@ -47,6 +47,10 @@ func TestDbSchemaCmd(t *testing.T) {
 	schema := &common.DatabaseSchema{
 		ID:   "svc-12345",
 		Name: "tsdb",
+		Extensions: []common.ExtensionInfo{
+			{Name: "timescaledb", Version: "2.22.0", Schema: "public"},
+			{Name: "timescaledb_toolkit", Version: "1.21.0", Schema: "public"},
+		},
 		Schemas: []common.NamespacedSchema{{
 			Name: "public",
 			Tables: []common.TableSchema{{
@@ -55,7 +59,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			}},
 		}},
 	}
-	const schemaText = "DATABASE: tsdb (svc-12345)\n\nSCHEMA: public\n\nTABLE: metrics\n  time  TIMESTAMPTZ NOT NULL\n"
+	const schemaText = "DATABASE: tsdb (svc-12345)\n\nEXTENSIONS:\n  timescaledb 2.22.0 (schema: public)\n  timescaledb_toolkit 1.21.0 (schema: public)\n\nSCHEMA: public\n\nTABLE: metrics\n  time  TIMESTAMPTZ NOT NULL\n"
 
 	runCmdTests(t, []cmdTest{
 		{
@@ -154,7 +158,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			name:       "prints the schema with the flag defaults",
 			args:       []string{"db", "schema", "svc-12345"},
 			mock:       setupGetWithStatus(api.DeployStatusREADY),
-			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, schema, nil)},
+			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", IncludeExtensions: true}, schema, nil)},
 			wantStdout: schemaText,
 		},
 		{
@@ -170,6 +174,7 @@ func TestDbSchemaCmd(t *testing.T) {
 				IncludeInternal:    true,
 				IncludeDefinitions: true,
 				IncludeComments:    true,
+				IncludeExtensions:  true,
 			}, schema, nil)},
 			wantStdout: schemaText,
 		},
@@ -182,7 +187,7 @@ func TestDbSchemaCmd(t *testing.T) {
 				expectResolveRef(m, "rep-67890", sampleReplica())
 				expectGetService(m, "svc-12345", sampleService())
 			},
-			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true}, schema, nil)},
+			opts:       []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", Pooled: true, IncludeExtensions: true}, schema, nil)},
 			wantStdout: schemaText,
 			wantStderr: "Warning: read replica \"replica-service\" has no connection pooler; connecting directly instead\n",
 		},
@@ -191,7 +196,7 @@ func TestDbSchemaCmd(t *testing.T) {
 			name:    "fetch fails",
 			args:    []string{"db", "schema", "svc-12345"},
 			mock:    setupGetWithStatus(api.DeployStatusREADY),
-			opts:    []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin"}, nil, errors.New("failed to connect to database: no route to host"))},
+			opts:    []runOption{withFetchServiceSchema(common.FetchServiceSchemaArgs{Role: "tsdbadmin", IncludeExtensions: true}, nil, errors.New("failed to connect to database: no route to host"))},
 			wantErr: "failed to connect to database: no route to host",
 		},
 	})

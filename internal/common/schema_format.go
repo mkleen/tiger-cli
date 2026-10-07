@@ -20,6 +20,13 @@ func FormatSchema(schema *DatabaseSchema) string {
 
 	fmt.Fprintf(&buf, "DATABASE: %s (%s)\n", schema.Name, schema.ID)
 
+	if len(schema.Extensions) > 0 {
+		buf.WriteString("\nEXTENSIONS:\n")
+		for _, ext := range schema.Extensions {
+			fmt.Fprintf(&buf, "  %s %s (schema: %s)\n", ext.Name, ext.Version, ext.Schema)
+		}
+	}
+
 	for _, ns := range schema.Schemas {
 		fmt.Fprintf(&buf, "\nSCHEMA: %s\n", ns.Name)
 		writeComment(&buf, ns.Comment)

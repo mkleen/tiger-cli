@@ -15,9 +15,20 @@ import (
 // DatabaseSchema holds complete schema information for a database, grouped
 // by namespace (Postgres schema).
 type DatabaseSchema struct {
-	ID      string             `json:"id"`
-	Name    string             `json:"name"`
-	Schemas []NamespacedSchema `json:"schemas"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Extensions lists the extensions installed in the database. They are
+	// database-wide, so a single-schema request still lists them all.
+	Extensions []ExtensionInfo    `json:"extensions,omitempty"`
+	Schemas    []NamespacedSchema `json:"schemas"`
+}
+
+// ExtensionInfo describes an installed extension. Schema is the namespace
+// its objects were created in, which callers need to qualify its functions.
+type ExtensionInfo struct {
+	Name    string `json:"name" db:"name"`
+	Version string `json:"version" db:"version"`
+	Schema  string `json:"schema" db:"schema_name"`
 }
 
 // NamespacedSchema groups the objects belonging to a single Postgres schema.
@@ -251,6 +262,9 @@ type FetchServiceSchemaArgs struct {
 	// IncludeComments fetches object comments (COMMENT ON text), omitted by
 	// default to keep the output concise.
 	IncludeComments bool
+	// IncludeExtensions fetches the installed extensions. Only the CLI sets
+	// it; the db_schema MCP tool leaves it off.
+	IncludeExtensions bool
 }
 
 // schemaFilter holds the SQL fragments needed to scope a query to the
@@ -964,6 +978,29 @@ ORDER BY n.nspname, p.proname, routine_args`,
 	)
 }
 
+// buildExtensionsQuery returns the installed extensions. Extensions are
+// database-wide, so the --schema filter does not apply; extensions living in
+// pg_catalog (plpgsql) are hidden unless internal objects are requested, the
+// same rule the default browse applies to the catalog schemas.
+func buildExtensionsQuery(f schemaFilter) string {
+	exclusion := ""
+	if !f.includeInternal {
+		exclusion = " AND n.nspname <> 'pg_catalog'"
+	}
+	return fmt.Sprintf(`
+SELECT
+    e.extname AS name,
+    e.extversion AS version,
+    n.nspname AS schema_name
+FROM pg_catalog.pg_extension e
+JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace
+WHERE TRUE
+  %s
+ORDER BY e.extname`,
+		exclusion,
+	)
+}
+
 // buildHypertablesQuery returns hypertable metadata for the requested
 // schemas. Caller must verify the timescaledb extension is installed before
 // running this (see hasTimescaleDB); otherwise the query errors with
@@ -1175,6 +1212,14 @@ func fetchSchemaFromConn(ctx context.Context, conn *pgx.Conn, ident SchemaIdent,
 	// then assemble the final NamespacedSchema slice in name order.
 	bld := newSchemaBuilder()
 
+	var extensions []ExtensionInfo
+	if args.IncludeExtensions {
+		var err error
+		extensions, err = fetchExtensions(ctx, conn, filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch extensions: %w", err)
+		}
+	}
 	if err := fetchRelationsAndColumns(ctx, conn, filter, bld); err != nil {
 		return nil, fmt.Errorf("failed to fetch relations: %w", err)
 	}
@@ -1226,9 +1271,10 @@ func fetchSchemaFromConn(ctx context.Context, conn *pgx.Conn, ident SchemaIdent,
 	}
 
 	return &DatabaseSchema{
-		ID:      ident.ID,
-		Name:    ident.Name,
-		Schemas: bld.build(),
+		ID:         ident.ID,
+		Name:       ident.Name,
+		Extensions: extensions,
+		Schemas:    bld.build(),
 	}, nil
 }
 
@@ -1684,6 +1730,15 @@ func fetchSchemaComments(ctx context.Context, conn *pgx.Conn, f schemaFilter, b 
 		}
 	}
 	return nil
+}
+
+// fetchExtensions returns the installed extensions, ordered by name.
+func fetchExtensions(ctx context.Context, conn *pgx.Conn, f schemaFilter) ([]ExtensionInfo, error) {
+	rows, err := conn.Query(ctx, buildExtensionsQuery(f))
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowToStructByName[ExtensionInfo])
 }
 
 // hasTimescaleDB reports whether the timescaledb extension is installed.

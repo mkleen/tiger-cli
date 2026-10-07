@@ -17,10 +17,10 @@ func buildDbSchemaCmd(app *common.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "schema [name-or-id]",
 		Short: "Display database schema information",
-		Long: `Display the schema of a database service: tables (regular, partitioned, and
-foreign), views, materialized views, enum types, functions, procedures,
-indexes, triggers, and TimescaleDB hypertable and continuous aggregate
-metadata.
+		Long: `Display the schema of a database service: installed extensions and their
+versions, tables (regular, partitioned, and foreign), views, materialized
+views, enum types, functions, procedures, indexes, triggers, and TimescaleDB
+hypertable and continuous aggregate metadata.
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. You can also pass a read replica set ID to
@@ -77,6 +77,7 @@ large and may embed implementation details.`,
 				IncludeInternal:    internal,
 				IncludeDefinitions: definitions,
 				IncludeComments:    comments,
+				IncludeExtensions:  true,
 			})
 			if err != nil {
 				return handleDatabaseError(err, target)

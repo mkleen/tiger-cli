@@ -115,6 +115,8 @@ func (s *Server) handleDBSchema(ctx context.Context, req *mcp.CallToolRequest, i
 	// A replica without a pooler connects directly; surface that as a warning.
 	warning := common.ReplicaPoolerWarning(target, input.Pooled)
 
+	// Unlike `tiger db schema`, the tool leaves IncludeExtensions off, so
+	// its output has no EXTENSIONS list.
 	schema, err := common.FetchServiceSchema(ctx, cfg, target, common.FetchServiceSchemaArgs{
 		Role:               input.Role,
 		Pooled:             input.Pooled,

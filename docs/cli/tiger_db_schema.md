@@ -4,10 +4,10 @@ Display database schema information
 
 ### Synopsis
 
-Display the schema of a database service: tables (regular, partitioned, and
-foreign), views, materialized views, enum types, functions, procedures,
-indexes, triggers, and TimescaleDB hypertable and continuous aggregate
-metadata.
+Display the schema of a database service: installed extensions and their
+versions, tables (regular, partitioned, and foreign), views, materialized
+views, enum types, functions, procedures, indexes, triggers, and TimescaleDB
+hypertable and continuous aggregate metadata.
 
 The service can be given by ID or name as an argument, or will use the default
 service from your configuration. You can also pass a read replica set ID to
