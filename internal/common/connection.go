@@ -1,8 +1,11 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"net/url"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/timescale/tiger-cli/internal/api"
 	"github.com/timescale/tiger-cli/internal/config"
@@ -153,4 +156,37 @@ func GetPassword(cfg *config.Config, service api.Service, role string) (string, 
 		return "", fmt.Errorf("no password available for service")
 	}
 	return password, nil
+}
+
+// connectReadOnly checks that the target is ready and opens a connection to it
+// in Tiger Cloud's immutable read-only mode, for catalog reads such as schema
+// introspection and the extension listing. The caller must close the returned
+// connection.
+func connectReadOnly(ctx context.Context, cfg *config.Config, target *ConnectionTarget, role string, pooled bool) (*pgx.Conn, error) {
+	if err := CheckServiceReady(target.ConnectionService); err != nil {
+		return nil, err
+	}
+
+	details, err := target.Details(cfg, ConnectionDetailsOptions{
+		Pooled:       pooled,
+		Role:         role,
+		WithPassword: true,
+		ReadOnly:     true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	connConfig, err := pgx.ParseConfig(details.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connection string: %w", err)
+	}
+	// Catalog reads run parameterless statements, so the simple protocol fits.
+	connConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	conn, err := pgx.ConnectConfig(ctx, connConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+	return conn, nil
 }

@@ -46,6 +46,7 @@ const (
 	toolServiceBackupRegionRemove = "service_backup_region_remove"
 	toolDBQuery                   = "db_query"
 	toolDBSchema                  = "db_schema"
+	toolDBExtensions              = "db_extensions"
 	toolFeedback                  = "feedback"
 )
 
@@ -233,6 +234,7 @@ func (s *Server) registerDatabaseTools(mode config.ReadOnlyMode) {
 	addTool(s, mode, newDBQueryTool(), s.handleDBQuery)
 
 	mcp.AddTool(s.mcpServer, newDBSchemaTool(), s.handleDBSchema)
+	mcp.AddTool(s.mcpServer, newDBExtensionsTool(), s.handleDBExtensions)
 }
 
 // analyticsMiddleware tracks analytics for all MCP requests
